@@ -22,7 +22,25 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    console.log('db running');
+    console.log("db running");
+
+    const userCollection = client.db("quickGig").collection("users");
+
+    //users related api
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+    //sort for best workers
+    app.get("/sortWorkers", async (req, res) => {
+      const filter = { role: "worker" };
+      const sort = { coin: -1 };
+      const result = await userCollection.find(filter).sort(sort).toArray();
+      console.log(result);
+      res.send(result);
+    });
   } finally {
   }
 }
