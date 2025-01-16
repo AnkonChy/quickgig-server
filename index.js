@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const port = process.env.PORT || 4000;
 
@@ -26,9 +27,25 @@ async function run() {
 
     const userCollection = client.db("quickGig").collection("users");
 
+    //jwt related api
+
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
     //users related api
     app.post("/users", async (req, res) => {
       const user = req.body;
+      //insert email if user doesn't exists:
+      //you can do this many ways(1. email uniques, 2.upsert, 3. simple checking)
+      const query = { email: user.email };
+      const existingUser = await userCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: "user already exists", insertedId: null });
+      }
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
@@ -38,7 +55,6 @@ async function run() {
       const filter = { role: "worker" };
       const sort = { coin: -1 };
       const result = await userCollection.find(filter).sort(sort).toArray();
-      console.log(result);
       res.send(result);
     });
   } finally {
