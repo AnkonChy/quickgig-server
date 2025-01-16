@@ -26,6 +26,7 @@ async function run() {
     console.log("db running");
 
     const userCollection = client.db("quickGig").collection("users");
+    const taskCollection = client.db("quickGig").collection("tasks");
 
     //jwt related api
 
@@ -55,6 +56,13 @@ async function run() {
       const filter = { role: "worker" };
       const sort = { coin: -1 };
       const result = await userCollection.find(filter).sort(sort).toArray();
+      res.send(result);
+    });
+
+    //task related api
+    app.post("/addTask", async (req, res) => {
+      const data = req.body;
+      const result = await taskCollection.insertOne(data);
       res.send(result);
     });
   } finally {
