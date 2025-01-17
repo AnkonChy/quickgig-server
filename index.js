@@ -65,20 +65,21 @@ async function run() {
 
     //add task
     app.post("/addTask", async (req, res) => {
-      const {
-        title,
-        detail,
-        req_workers,
-        amount,
-        completion_date,
-        sub_info,
-        task_img_url,
-        owner_email,
-        buyer_name,
-      } = req.body;
+      // const {
+      //   title,
+      //   detail,
+      //   req_workers,
+      //   amount,
+      //   completion_date,
+      //   sub_info,
+      //   task_img_url,
+      //   buyer_email,
+      //   buyer_name,
+      // } = req.body;
+      const data = req.body;
 
-      const user = await userCollection.findOne({ email: owner_email });
-      console.log(user);
+      // const user = await userCollection.findOne({ email: owner_email });
+      // console.log(user);
 
       const result = await taskCollection.insertOne(data);
       res.send(result);
@@ -138,10 +139,19 @@ async function run() {
       res.send(result);
     });
 
+    // Submission related api
     //add submit form into submitCollection
     app.post("/addSubmit", async (req, res) => {
       const data = req.body;
       const result = await submitCollection.insertOne(data);
+      res.send(result);
+    });
+
+    //show all sumission api related worker email
+    app.get("/allSubmission/worker", async (req, res) => {
+      const email = req.query.email;
+      const filter = { worker_email: email };
+      const result = await submitCollection.find(filter).toArray();
       res.send(result);
     });
   } finally {
