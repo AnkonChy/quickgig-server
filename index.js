@@ -65,7 +65,21 @@ async function run() {
 
     //add task
     app.post("/addTask", async (req, res) => {
-      const data = req.body;
+      const {
+        title,
+        detail,
+        req_workers,
+        amount,
+        completion_date,
+        sub_info,
+        task_img_url,
+        owner_email,
+        buyer_name,
+      } = req.body;
+
+      const user = await userCollection.findOne({ email: owner_email });
+      console.log(user);
+
       const result = await taskCollection.insertOne(data);
       res.send(result);
     });
@@ -73,11 +87,12 @@ async function run() {
     //my tasks by email
     app.get("/tasks/owner", async (req, res) => {
       const email = req.query.email;
+      console.log(email);
       const filter = { task_owner: email };
       // const sort = { date: -1 };
 
       const result = await taskCollection.find(filter).toArray();
-      console.log(result);
+      // console.log(result);
       res.send(result);
     });
 
@@ -113,6 +128,13 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await taskCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    //all task where required_worker > 0
+    app.get("/allTasks", async (req, res) => {
+      const query = { req_workers: { $gt: 0 } };
+      const result = await taskCollection.find(query).toArray();
       res.send(result);
     });
   } finally {
