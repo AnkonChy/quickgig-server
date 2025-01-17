@@ -38,6 +38,8 @@ async function run() {
       res.send({ token });
     });
     //users related api
+
+    //add user
     app.post("/users", async (req, res) => {
       const user = req.body;
       //insert email if user doesn't exists:
@@ -60,9 +62,21 @@ async function run() {
     });
 
     //task related api
+
+    //add task
     app.post("/addTask", async (req, res) => {
       const data = req.body;
       const result = await taskCollection.insertOne(data);
+      res.send(result);
+    });
+
+    //my tasks by email
+    app.get("/tasks/owner", async (req, res) => {
+      const email = req.query.email
+      const filter = { task_owner: email };
+      const sort = { date: -1 };
+
+      const result = await taskCollection.find(filter).sort(sort).toArray();
       res.send(result);
     });
   } finally {
