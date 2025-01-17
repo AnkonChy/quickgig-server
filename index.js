@@ -3,7 +3,7 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 4000;
 
 //middleware
@@ -72,11 +72,47 @@ async function run() {
 
     //my tasks by email
     app.get("/tasks/owner", async (req, res) => {
-      const email = req.query.email
+      const email = req.query.email;
       const filter = { task_owner: email };
-      const sort = { date: -1 };
+      // const sort = { date: -1 };
 
-      const result = await taskCollection.find(filter).sort(sort).toArray();
+      const result = await taskCollection.find(filter).toArray();
+      console.log(result);
+      res.send(result);
+    });
+
+    app.get("/task/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await taskCollection.findOne(query);
+      res.send(result);
+    });
+
+    //update task
+    app.patch("/task/:id", async (req, res) => {
+      const task = req.body;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          title: task.title,
+          detail: task.detail,
+          req_workers: task.req_workers,
+          amount: task.amount,
+          completion_date: task.completion_date,
+          sub_info: task.sub_info,
+          task_img_url: task.task_img_url,
+        },
+      };
+      const result = await taskCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    //delete task
+    app.delete("/task/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await taskCollection.deleteOne(query);
       res.send(result);
     });
   } finally {
