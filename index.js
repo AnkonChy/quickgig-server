@@ -216,7 +216,21 @@ async function run() {
     app.delete("/task/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
+
+      //get the task by parameter id
+      const task = await taskCollection.findOne({ _id: new ObjectId(id) });
+
+      const totalRefundAmount = task.req_workers * task.amount;
+
+      // refund coin in coin collection
+      const filter = { email: task.buyer_email };
+      const updateDoc = {
+        $inc: { coin: totalRefundAmount },
+      };
+      const coinRefund = await userCollection.updateOne(filter, updateDoc);
+
       const result = await taskCollection.deleteOne(query);
+
       res.send(result);
     });
 
