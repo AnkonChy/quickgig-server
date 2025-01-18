@@ -37,6 +37,37 @@ async function run() {
       });
       res.send({ token });
     });
+
+    //middlarwared
+    const verifyToken = (req, res, next) => {
+      // console.log("Inside verify token", req.headers.authorization);
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: "unathorized" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+        // console.log(decoded);
+        if (error) {
+          return res.status(401).send({ message: "unathorized" });
+        }
+        req.decoded = decoded;
+        next();
+      });
+      // next();
+    };
+
+    //use verify admin after verifytoken
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
     //users related api
 
     //add user
@@ -53,8 +84,32 @@ async function run() {
       res.send(result);
     });
 
+    //check admin
+    app.get(
+      "/users/admin/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+
+        if (email !== req.decoded.email) {
+          return res.status(403).send({ message: "forbidden access" });
+        }
+
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        let admin = false;
+        if (user) {
+          admin = user?.role === "admin";
+        }
+
+        // console.log(admin);
+        res.send({ admin });
+      }
+    );
+
     //all users
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
@@ -72,6 +127,19 @@ async function run() {
       const filter = { role: "worker" };
       const sort = { coin: -1 };
       const result = await userCollection.find(filter).sort(sort).toArray();
+      res.send(result);
+    });
+
+    app.patch("/users/makeRole/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const { role } = req.body;
+      const updatedDoc = {
+        $set: {
+          role: role,
+        },
+      };
+      const result = await userCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
 
@@ -102,7 +170,6 @@ async function run() {
     //my tasks by email
     app.get("/tasks/owner", async (req, res) => {
       const email = req.query.email;
-      console.log(email);
       const filter = { task_owner: email };
       // const sort = { date: -1 };
 
