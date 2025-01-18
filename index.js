@@ -59,6 +59,14 @@ async function run() {
       res.send(result);
     });
 
+    //delete user
+    app.delete("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await userCollection.deleteOne(filter);
+      res.send(result);
+    });
+
     //sort for best workers
     app.get("/sortWorkers", async (req, res) => {
       const filter = { role: "worker" };
