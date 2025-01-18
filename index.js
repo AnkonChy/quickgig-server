@@ -88,7 +88,7 @@ async function run() {
     app.get(
       "/users/admin/:email",
       verifyToken,
-      verifyAdmin,
+      // verifyAdmin,
       async (req, res) => {
         const email = req.params.email;
 
@@ -109,7 +109,7 @@ async function run() {
     );
 
     //all users
-    app.get("/users", verifyToken, async (req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
@@ -130,47 +130,54 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/users/makeRole/:id", async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const { role } = req.body;
-      const updatedDoc = {
-        $set: {
-          role: role,
-        },
-      };
-      const result = await userCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
+    app.patch(
+      "/users/makeRole/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const { role } = req.body;
+        const updatedDoc = {
+          $set: {
+            role: role,
+          },
+        };
+        const result = await userCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
 
     //task related api
 
     //add task
-    app.post("/addTask", async (req, res) => {
-      // const {
-      //   title,
-      //   detail,
-      //   req_workers,
-      //   amount,
-      //   completion_date,
-      //   sub_info,
-      //   task_img_url,
-      //   buyer_email,
-      //   buyer_name,
-      // } = req.body;
+    app.post("/addTask", verifyToken, async (req, res) => {
       const data = req.body;
 
-      // const user = await userCollection.findOne({ email: owner_email });
-      // console.log(user);
+      //reduce coin
+      const totalPayableAmount = data.req_workers * data.amount;
 
+      const user = await userCollection.findOne({ email: data?.buyer_email });
+      if (!user || user.coin < totalPayableAmount) {
+        return res
+          .status(400)
+          .send({ error: "Not avaiable Coin. Purchase Coin" });
+      }
       const result = await taskCollection.insertOne(data);
-      res.send(result);
+
+      const filter = { email: data?.buyer_email };
+      const updateDoc = {
+        $inc: { coin: -totalPayableAmount },
+      };
+
+      const updateCoin = await userCollection.updateOne(filter, updateDoc);
+      res.send({ result, updateCoin });
     });
 
     //my tasks by email
     app.get("/tasks/owner", async (req, res) => {
       const email = req.query.email;
-      const filter = { task_owner: email };
+      const filter = { buyer_email: email };
       // const sort = { date: -1 };
 
       const result = await taskCollection.find(filter).toArray();
