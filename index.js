@@ -53,6 +53,12 @@ async function run() {
       res.send(result);
     });
 
+    //all users
+    app.get("/users", async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+
     //sort for best workers
     app.get("/sortWorkers", async (req, res) => {
       const filter = { role: "worker" };
