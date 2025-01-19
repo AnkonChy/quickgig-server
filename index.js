@@ -88,7 +88,6 @@ async function run() {
     app.get(
       "/users/admin/:email",
       verifyToken,
-      // verifyAdmin,
       async (req, res) => {
         const email = req.params.email;
 
@@ -105,6 +104,50 @@ async function run() {
 
         // console.log(admin);
         res.send({ admin });
+      }
+    );
+    //check buyer
+    app.get(
+      "/users/buyer/:email",
+      verifyToken,
+      async (req, res) => {
+        const email = req.params.email;
+
+        if (email !== req.decoded.email) {
+          return res.status(403).send({ message: "forbidden access" });
+        }
+
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        let buyer = false;
+        if (user) {
+          buyer = user?.role === "buyer";
+        }
+
+        // console.log(admin);
+        res.send({ buyer });
+      }
+    );
+    //check worker
+    app.get(
+      "/users/worker/:email",
+      verifyToken,
+      async (req, res) => {
+        const email = req.params.email;
+
+        if (email !== req.decoded.email) {
+          return res.status(403).send({ message: "forbidden access" });
+        }
+
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        let worker = false;
+        if (user) {
+          worker = user?.role === "worker";
+        }
+
+        // console.log(admin);
+        res.send({ worker });
       }
     );
 
@@ -254,6 +297,16 @@ async function run() {
       const email = req.query.email;
       const filter = { worker_email: email };
       const result = await submitCollection.find(filter).toArray();
+      res.send(result);
+    });
+
+    //task to review.submission by buyer email where pending
+    app.get("/submission/buyer_email", async (req, res) => {
+      const email = req.query.email;
+      console.log('dd',email);
+      const filter = { buyer_email: email, status: "pending" };
+      const result = await submitCollection.find(filter).toArray();
+      console.log(result);
       res.send(result);
     });
   } finally {
