@@ -299,6 +299,7 @@ async function run() {
     });
 
     //stats or analytics
+    //admin
     app.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
       const filterWorker = { role: "worker" };
       const totalWorker = await userCollection.countDocuments(filterWorker);
@@ -319,6 +320,15 @@ async function run() {
 
       const totalAvailableCoin = result.length > 0 ? result[0].totalCoin : 0;
       res.send({ totalWorker, totalBuyer, totalAvailableCoin });
+    });
+
+    //buyer
+    app.get("/buyer-stats", async (req, res) => {
+      const email = req.query.email;
+      const filter = { buyer_email: email };
+      const totalTask = await taskCollection.countDocuments(filter);
+
+      res.send({ totalTask });
     });
   } finally {
   }
