@@ -85,71 +85,59 @@ async function run() {
     });
 
     //check admin
-    app.get(
-      "/users/admin/:email",
-      verifyToken,
-      async (req, res) => {
-        const email = req.params.email;
+    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
 
-        if (email !== req.decoded.email) {
-          return res.status(403).send({ message: "forbidden access" });
-        }
-
-        const query = { email: email };
-        const user = await userCollection.findOne(query);
-        let admin = false;
-        if (user) {
-          admin = user?.role === "admin";
-        }
-
-        // console.log(admin);
-        res.send({ admin });
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: "forbidden access" });
       }
-    );
+
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user?.role === "admin";
+      }
+
+      // console.log(admin);
+      res.send({ admin });
+    });
     //check buyer
-    app.get(
-      "/users/buyer/:email",
-      verifyToken,
-      async (req, res) => {
-        const email = req.params.email;
+    app.get("/users/buyer/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
 
-        if (email !== req.decoded.email) {
-          return res.status(403).send({ message: "forbidden access" });
-        }
-
-        const query = { email: email };
-        const user = await userCollection.findOne(query);
-        let buyer = false;
-        if (user) {
-          buyer = user?.role === "buyer";
-        }
-
-        // console.log(admin);
-        res.send({ buyer });
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: "forbidden access" });
       }
-    );
+
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      let buyer = false;
+      if (user) {
+        buyer = user?.role === "buyer";
+      }
+
+      // console.log(admin);
+      res.send({ buyer });
+    });
     //check worker
-    app.get(
-      "/users/worker/:email",
-      verifyToken,
-      async (req, res) => {
-        const email = req.params.email;
+    app.get("/users/worker/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
 
-        if (email !== req.decoded.email) {
-          return res.status(403).send({ message: "forbidden access" });
-        }
-
-        const query = { email: email };
-        const user = await userCollection.findOne(query);
-        let worker = false;
-        if (user) {
-          worker = user?.role === "worker";
-        }
-
-        // console.log(admin);
-        res.send({ worker });
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: "forbidden access" });
       }
-    );
+
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      let worker = false;
+      if (user) {
+        worker = user?.role === "worker";
+      }
+
+      // console.log(admin);
+      res.send({ worker });
+    });
 
     //all users
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
@@ -303,11 +291,34 @@ async function run() {
     //task to review.submission by buyer email where pending
     app.get("/submission/buyer_email", async (req, res) => {
       const email = req.query.email;
-      console.log('dd',email);
+      console.log("dd", email);
       const filter = { buyer_email: email, status: "pending" };
       const result = await submitCollection.find(filter).toArray();
       console.log(result);
       res.send(result);
+    });
+
+    //stats or analytics
+    app.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
+      const filterWorker = { role: "worker" };
+      const totalWorker = await userCollection.countDocuments(filterWorker);
+      const filterBuyer = { role: "buyer" };
+      const totalBuyer = await userCollection.countDocuments(filterBuyer);
+      const result = await userCollection
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              totalCoin: {
+                $sum: "$coin",
+              },
+            },
+          },
+        ])
+        .toArray();
+
+      const totalAvailableCoin = result.length > 0 ? result[0].totalCoin : 0;
+      res.send({ totalWorker, totalBuyer, totalAvailableCoin });
     });
   } finally {
   }
