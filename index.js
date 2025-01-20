@@ -161,6 +161,13 @@ async function run() {
       res.send(result);
     });
 
+    //user by logged email
+    app.get("/users/email", async (req, res) => {
+      const email = { email: req.query.email };
+      const result = await userCollection.findOne(email);
+      res.send(result);
+    });
+
     app.patch(
       "/users/makeRole/:id",
       verifyToken,
@@ -288,13 +295,69 @@ async function run() {
       res.send(result);
     });
 
+    //aprove submission
+    app.patch("/submission/approve", async (req, res) => {
+      const { submissionId } = req.body;
+      const submission = await submitCollection.findOne({
+        _id: new ObjectId(submissionId),
+      });
+
+      const { worker_email, payable_amount } = submission;
+      console.log(worker_email, payable_amount);
+
+      //increment worker's collection
+      const coinUpdateResult = await userCollection.updateOne(
+        { email: worker_email },
+        { $inc: { coin: payable_amount } }
+      );
+
+      // update submission status to approve
+      const statusUpdate = await submitCollection.updateOne(
+        {
+          _id: new ObjectId(submissionId),
+        },
+        {
+          $set: { status: "approve" },
+        }
+      );
+
+      res.send({ coinUpdateResult, statusUpdate });
+    });
+
+    //reject submission
+    app.patch("/submission/reject", async (req, res) => {
+      const { submissionId, taskId } = req.body;
+      console.log(submissionId, taskId);
+      const submission = await submitCollection.findOne({
+        _id: new ObjectId(submissionId),
+      });
+
+      const { worker_email } = submission;
+
+      // //increment worker's collection
+      const increaseWorker = await taskCollection.updateOne(
+        { _id: new ObjectId(taskId) },
+        { $inc: { req_workers: 1 } }
+      );
+
+      // update submission status to approve
+      const rejectstatusUpdate = await submitCollection.updateOne(
+        {
+          _id: new ObjectId(submissionId),
+        },
+        {
+          $set: { status: "rejected" },
+        }
+      );
+
+      res.send({ rejectstatusUpdate, increaseWorker });
+    });
+
     //task to review.submission by buyer email where pending
     app.get("/submission/buyer_email", async (req, res) => {
       const email = req.query.email;
-      console.log("dd", email);
       const filter = { buyer_email: email, status: "pending" };
       const result = await submitCollection.find(filter).toArray();
-      console.log(result);
       res.send(result);
     });
 
@@ -328,7 +391,23 @@ async function run() {
       const filter = { buyer_email: email };
       const totalTask = await taskCollection.countDocuments(filter);
 
-      res.send({ totalTask });
+      const result = await taskCollection
+        .aggregate([
+          {
+            $match: filter,
+          },
+          {
+            $group: {
+              _id: null,
+              totalWorkers: { $sum: "$req_workers" },
+            },
+          },
+        ])
+        .toArray();
+
+      const pendingTask = result.length > 0 ? result[0].totalWorkers : 0;
+
+      res.send({ totalTask, pendingTask });
     });
   } finally {
   }
