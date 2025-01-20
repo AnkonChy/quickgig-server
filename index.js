@@ -32,6 +32,7 @@ async function run() {
     const paymentCardCollection = client
       .db("quickGig")
       .collection("paymentCard");
+    const paymentCollection = client.db("quickGig").collection("payments");
     //jwt related api
 
     app.post("/jwt", async (req, res) => {
@@ -305,6 +306,7 @@ async function run() {
     //show all sumission api related worker email
     app.get("/allSubmission/worker", async (req, res) => {
       const email = req.query.email;
+      console.log(email);
       const filter = { worker_email: email };
       const result = await submitCollection.find(filter).toArray();
       res.send(result);
@@ -318,7 +320,7 @@ async function run() {
       });
 
       const { worker_email, payable_amount } = submission;
-      console.log(worker_email, payable_amount);
+      // console.log(worker_email, payable_amount);
 
       //increment worker's collection
       const coinUpdateResult = await userCollection.updateOne(
@@ -342,7 +344,7 @@ async function run() {
     //reject submission
     app.patch("/submission/reject", async (req, res) => {
       const { submissionId, taskId } = req.body;
-      console.log(submissionId, taskId);
+      // console.log(submissionId, taskId);
       const submission = await submitCollection.findOne({
         _id: new ObjectId(submissionId),
       });
@@ -443,7 +445,7 @@ async function run() {
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
-      console.log(amount, "assdddd");
+      // console.log(amount, "assdddd");
 
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
@@ -454,6 +456,33 @@ async function run() {
       res.send({
         clientSecret: paymentIntent.client_secret,
       });
+    });
+
+    //payment related api
+    app.get("/paymentHistory/:email", verifyToken, async (req, res) => {
+      const query = { email: req.params.email };
+      if (req.params.email !== req.decoded.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result);
+    });
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollection.insertOne(payment);
+      // console.log("payment info", payment);
+
+      const { email, price } = payment;
+      let coinsToAdd = 0;
+      if (price === 1) coinsToAdd = 10;
+      else if (price === 10) coinsToAdd = 150;
+      else if (price === 20) coinsToAdd = 500;
+      else if (price === 35) coinsToAdd = 1000;
+      const coinUpdate = await userCollection.updateOne(
+        { email },
+        { $inc: { coin: coinsToAdd } }
+      );
+      res.send(paymentResult);
     });
   } finally {
   }
