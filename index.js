@@ -4,6 +4,7 @@ const app = express();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 4000;
 
 //middleware
@@ -28,6 +29,9 @@ async function run() {
     const userCollection = client.db("quickGig").collection("users");
     const taskCollection = client.db("quickGig").collection("tasks");
     const submitCollection = client.db("quickGig").collection("submit");
+    const paymentCardCollection = client
+      .db("quickGig")
+      .collection("paymentCard");
     //jwt related api
 
     app.post("/jwt", async (req, res) => {
@@ -63,6 +67,17 @@ async function run() {
       const user = await userCollection.findOne(query);
       const isAdmin = user?.role === "admin";
       if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+    //use verify buyer after verifytoken
+    const verifyBuyer = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isBuyer = user?.role === "buyer";
+      if (!isBuyer) {
         return res.status(403).send({ message: "forbidden access" });
       }
       next();
@@ -189,7 +204,7 @@ async function run() {
     //task related api
 
     //add task
-    app.post("/addTask", verifyToken, async (req, res) => {
+    app.post("/addTask", verifyToken, verifyBuyer, async (req, res) => {
       const data = req.body;
 
       //reduce coin
@@ -408,6 +423,37 @@ async function run() {
       const pendingTask = result.length > 0 ? result[0].totalWorkers : 0;
 
       res.send({ totalTask, pendingTask });
+    });
+
+    //paymentCard
+    app.get("/payment-card", async (req, res) => {
+      const result = await paymentCardCollection.find().toArray();
+      res.send(result);
+    });
+
+    //payment card single details
+    app.get("/paymentCard/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await paymentCardCollection.findOne(query);
+      res.send(result);
+    });
+
+    //payment intent
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      console.log(amount, "assdddd");
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
     });
   } finally {
   }
