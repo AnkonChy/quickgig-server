@@ -33,6 +33,22 @@ async function run() {
       .db("quickGig")
       .collection("paymentCard");
     const paymentCollection = client.db("quickGig").collection("payments");
+    const blogCollection = client.db("quickGig").collection("blogs");
+    const reviewCollection = client.db("quickGig").collection("reviews");
+    const withdrawalCollection = client
+      .db("quickGig")
+      .collection("withdrawals");
+
+    // blog related api
+    app.get("/allBlogs", async (req, res) => {
+      const result = await blogCollection.find().toArray();
+      res.send(result);
+    });
+    // review related api
+    app.get("/allReviews", async (req, res) => {
+      const result = await reviewCollection.find().toArray();
+      res.send(result);
+    });
     //jwt related api
 
     app.post("/jwt", async (req, res) => {
@@ -295,6 +311,11 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/tasks", async (req, res) => {
+      const result = await taskCollection.find().toArray();
+      res.send(result);
+    });
+
     // Submission related api
     //add submit form into submitCollection
     app.post("/addSubmit", async (req, res) => {
@@ -306,7 +327,7 @@ async function run() {
     //show all sumission api related worker email
     app.get("/allSubmission/worker", async (req, res) => {
       const email = req.query.email;
-      console.log(email);
+      // console.log(email);
       const filter = { worker_email: email };
       const result = await submitCollection.find(filter).toArray();
       res.send(result);
@@ -445,7 +466,6 @@ async function run() {
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
-      // console.log(amount, "assdddd");
 
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
@@ -456,6 +476,54 @@ async function run() {
       res.send({
         clientSecret: paymentIntent.client_secret,
       });
+    });
+
+    //withdrawal form
+    app.get("/withdrawal", async (req, res) => {
+      const email = req.query.email;
+      // console.log(email);
+      const filter = { email: email };
+      const user = await userCollection.findOne(filter);
+      // console.log(user);
+      let coins = user.coin;
+
+      const withdrawalAmount = (coins / 20).toFixed(2);
+      res
+        .status(200)
+        .send({ message: "Withdrawal successfull", coins, withdrawalAmount });
+    });
+
+    //add withdraw
+    app.post("/addWithdraw", async (req, res) => {
+      const data = req.body;
+      // console.log(data);
+      const result = await withdrawalCollection.insertOne(data);
+      res.send(result);
+    });
+
+    //withdraw request
+    app.get("/withdrawRequest", async (req, res) => {
+      const filter = { status: "pending" };
+      const result = await withdrawalCollection.find(filter).toArray();
+      res.send(result);
+    });
+
+    //payment success from withdraw request
+    app.patch("/paymentSuccess/:id", async (req, res) => {
+      const id = req.params.id;
+      const { withdrawCoin, worker_email } = req.body;
+      console.log(withdrawCoin, worker_email);
+      const withdrawalResult = await withdrawalCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status: "approved" } }
+      );
+
+      const userResult = await userCollection.updateOne(
+        { email: worker_email },
+        { $inc: { coin: -withdrawCoin } }
+      );
+
+      res.send({ withdrawCoin, userResult });
     });
 
     //payment related api
