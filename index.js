@@ -172,13 +172,13 @@ async function run() {
     });
 
     //all users
-    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/users", async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
 
     //delete user
-    app.delete("/users/:id", async (req, res) => {
+    app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const result = await userCollection.deleteOne(filter);
@@ -311,8 +311,22 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/tasks", async (req, res) => {
+    app.get("/tasks", verifyToken, verifyAdmin, async (req, res) => {
       const result = await taskCollection.find().toArray();
+      res.send(result);
+    });
+
+    //manage tasks in admin(all tasks)
+    app.get("/manageTasks", verifyToken, verifyAdmin, async (req, res) => {
+      const result = await taskCollection.find().toArray();
+      res.send(result);
+    });
+
+    //task delete from admin
+    app.delete("/task:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await taskCollection.deleteOne(filter);
       res.send(result);
     });
 
