@@ -512,28 +512,30 @@ async function run() {
       const email = req.query.email;
       const filter = { worker_email: email };
 
-      const workerStates = await submitCollection
+      const totalSubmission = await submitCollection.countDocuments(filter);
+      const filter2 = { worker_email: email, status: "pending" };
+
+      const pendingSubmission = await submitCollection.countDocuments(filter2);
+      const filter3 = { worker_email: email };
+
+      const result = await submitCollection
         .aggregate([
           {
-            $match: filter,
+            $match: filter3,
           },
           {
-            $facet: {
-              totalSubmissions: [{ $count: "count" }],
-              totalPendingSubmissions: [
-                { $match: { status: "pending" } },
-                { $count: "count" },
-              ],
-              totalEarnings: [
-                { $match: { status: "approve" } },
-                { $group: { _id: null, total: { $sum: $payable_amount } } },
-              ],
+            $group: {
+              _id: null,
+              totalPayableAmount: {
+                $sum: "$payable_amount",
+              },
             },
           },
         ])
         .toArray();
 
-      res.send();
+      const totalEarning = result.length > 0 ? result[0].totalPayableAmount : 0;
+      res.send({ totalSubmission, pendingSubmission, totalEarning });
     });
 
     //paymentCard
