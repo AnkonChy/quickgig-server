@@ -38,6 +38,27 @@ async function run() {
     const withdrawalCollection = client
       .db("quickGig")
       .collection("withdrawals");
+    const notificationCollection = client
+      .db("quickGig")
+      .collection("notifications");
+
+    //add new notification
+    app.post("addNotification", async (req, res) => {
+      const data = req.body;
+      const result = await notificationCollection.insertOne(data);
+      res.send(result);
+    });
+
+    //get notification for email
+    app.get("/notificaitons", async (req, res) => {
+      const email = req.query.email;
+      const filter = { email: email };
+      const result = await notificationCollection
+        .find(filter)
+        .sort({ time: -1 })
+        .toArray();
+      res.send(result);
+    });
 
     // blog related api
     app.get("/allBlogs", async (req, res) => {
@@ -311,7 +332,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/tasks", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/tasks", async (req, res) => {
       const result = await taskCollection.find().toArray();
       res.send(result);
     });
@@ -323,7 +344,7 @@ async function run() {
     });
 
     //task delete from admin
-    app.delete("/task:id", async (req, res) => {
+    app.delete("/task:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const result = await taskCollection.deleteOne(filter);
@@ -333,9 +354,19 @@ async function run() {
     // Submission related api
     //add submit form into submitCollection
     app.post("/addSubmit", async (req, res) => {
-      const data = req.body;
-      const result = await submitCollection.insertOne(data);
-      res.send(result);
+      const submission = req.body;
+      const result = await submitCollection.insertOne(submission);
+
+      //add notification
+      const notification = {
+        message: `${submission.worker_name} has submitted a task: ${submission.task_title}.`,
+        toEmail: submission.buyer_email,
+        actionRoute: `/dashboard/buyer-home`,
+        time: new Date(),
+      };
+
+      await notificationCollection.insertOne(notification);
+      res.send({ message: "Submission created and notification sent", result });
     });
 
     //show all sumission api related worker email
@@ -373,7 +404,21 @@ async function run() {
         }
       );
 
-      res.send({ coinUpdateResult, statusUpdate });
+      //add notification
+      const notification = {
+        message: `You have earned ${submission.payable_amount} from ${submission.buyer_name} for completing ${submission.task_title}`,
+        toEmail: submission.worker_email,
+        actionRoute: "/dashboard/worker-home",
+        time: new Date(),
+      };
+
+      await notificationCollection.insertOne(notification);
+
+      res.send({
+        message: "Submission approved successfully",
+        coinUpdateResult,
+        statusUpdate,
+      });
     });
 
     //reject submission
@@ -460,6 +505,35 @@ async function run() {
       const pendingTask = result.length > 0 ? result[0].totalWorkers : 0;
 
       res.send({ totalTask, pendingTask });
+    });
+
+    //worker
+    app.get("/worker-stats", async (req, res) => {
+      const email = req.query.email;
+      const filter = { worker_email: email };
+
+      const workerStates = await submitCollection
+        .aggregate([
+          {
+            $match: filter,
+          },
+          {
+            $facet: {
+              totalSubmissions: [{ $count: "count" }],
+              totalPendingSubmissions: [
+                { $match: { status: "pending" } },
+                { $count: "count" },
+              ],
+              totalEarnings: [
+                { $match: { status: "approve" } },
+                { $group: { _id: null, total: { $sum: $payable_amount } } },
+              ],
+            },
+          },
+        ])
+        .toArray();
+
+      res.send();
     });
 
     //paymentCard
