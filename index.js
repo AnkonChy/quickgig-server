@@ -269,9 +269,9 @@ async function run() {
     app.get("/tasks/owner", async (req, res) => {
       const email = req.query.email;
       const filter = { buyer_email: email };
-      // const sort = { date: -1 };
+      const sort = { completion_date: -1 };
 
-      const result = await taskCollection.find(filter).toArray();
+      const result = await taskCollection.find(filter).sort(sort).toArray();
       // console.log(result);
       res.send(result);
     });
@@ -380,7 +380,7 @@ async function run() {
 
     //aprove submission
     app.patch("/submission/approve", async (req, res) => {
-      const { submissionId } = req.body;
+      const { submissionId, taskId } = req.body;
       const submission = await submitCollection.findOne({
         _id: new ObjectId(submissionId),
       });
@@ -402,6 +402,12 @@ async function run() {
         {
           $set: { status: "approve" },
         }
+      );
+
+      // //increment worker's collection
+      const decreseWorker = await taskCollection.updateOne(
+        { _id: new ObjectId(taskId) },
+        { $inc: { req_workers: -1 } }
       );
 
       //add notification
@@ -465,6 +471,7 @@ async function run() {
       const totalWorker = await userCollection.countDocuments(filterWorker);
       const filterBuyer = { role: "buyer" };
       const totalBuyer = await userCollection.countDocuments(filterBuyer);
+
       const result = await userCollection
         .aggregate([
           {
@@ -479,7 +486,23 @@ async function run() {
         .toArray();
 
       const totalAvailableCoin = result.length > 0 ? result[0].totalCoin : 0;
-      res.send({ totalWorker, totalBuyer, totalAvailableCoin });
+
+      //total payments
+      const result2 = await paymentCollection
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              allPayments: {
+                $sum: "$price",
+              },
+            },
+          },
+        ])
+        .toArray();
+
+      const totalPayments = result2.length > 0 ? result2[0].allPayments : 0;
+      res.send({ totalWorker, totalBuyer, totalAvailableCoin, totalPayments });
     });
 
     //buyer
@@ -504,7 +527,26 @@ async function run() {
 
       const pendingTask = result.length > 0 ? result[0].totalWorkers : 0;
 
-      res.send({ totalTask, pendingTask });
+      const filter2 = { email: email };
+      const result2 = await paymentCardCollection
+        .aggregate([
+          {
+            $match: filter2,
+          },
+          {
+            $group: {
+              _id: null,
+              totalPrice: {
+                $sum: "$coin",
+              },
+            },
+          },
+        ])
+        .toArray();
+
+      const totalPayment = result2.length > 0 ? result2[0].totalPrice : 0;
+
+      res.send({ totalTask, pendingTask, totalPayment });
     });
 
     //worker
@@ -516,7 +558,7 @@ async function run() {
       const filter2 = { worker_email: email, status: "pending" };
 
       const pendingSubmission = await submitCollection.countDocuments(filter2);
-      const filter3 = { worker_email: email };
+      const filter3 = { worker_email: email, status: "approve" };
 
       const result = await submitCollection
         .aggregate([
