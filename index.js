@@ -538,6 +538,14 @@ async function run() {
       res.send({ totalSubmission, pendingSubmission, totalEarning });
     });
 
+    //approved submission in worker dash
+    app.get("/approvedSubmissions", async (req, res) => {
+      const email = req.query.email;
+      const filter = { worker_email: email, status: "approve" };
+      const result = await submitCollection.find(filter).toArray();
+      res.send(result);
+    });
+
     //paymentCard
     app.get("/payment-card", async (req, res) => {
       const result = await paymentCardCollection.find().toArray();
