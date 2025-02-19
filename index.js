@@ -82,13 +82,11 @@ async function run() {
 
     //middlarwared
     const verifyToken = (req, res, next) => {
-      // console.log("Inside verify token", req.headers.authorization);
       if (!req.headers.authorization) {
         return res.status(401).send({ message: "unathorized" });
       }
       const token = req.headers.authorization.split(" ")[1];
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
-        // console.log(decoded);
         if (error) {
           return res.status(401).send({ message: "unathorized" });
         }
@@ -152,7 +150,6 @@ async function run() {
         admin = user?.role === "admin";
       }
 
-      // console.log(admin);
       res.send({ admin });
     });
     //check buyer
@@ -170,7 +167,6 @@ async function run() {
         buyer = user?.role === "buyer";
       }
 
-      // console.log(admin);
       res.send({ buyer });
     });
     //check worker
@@ -188,7 +184,6 @@ async function run() {
         worker = user?.role === "worker";
       }
 
-      // console.log(admin);
       res.send({ worker });
     });
 
@@ -272,7 +267,6 @@ async function run() {
       const sort = { completion_date: -1 };
 
       const result = await taskCollection.find(filter).sort(sort).toArray();
-      // console.log(result);
       res.send(result);
     });
 
@@ -333,7 +327,18 @@ async function run() {
     });
 
     app.get("/tasks", async (req, res) => {
-      const result = await taskCollection.find().toArray();
+      const { searchParams } = req.query;
+      const { sort } = req.query;
+      let options = {};
+      if (sort) {
+        options = { sort: { amount: sort === "asc" ? 1 : -1 } };
+      }
+      let query = {};
+      if (searchParams) {
+        query = { title: { $regex: searchParams, $options: "i" } };
+      }
+
+      const result = await taskCollection.find(query, options).toArray();
       res.send(result);
     });
 
@@ -372,7 +377,6 @@ async function run() {
     //show all sumission api related worker email
     app.get("/allSubmission/worker", async (req, res) => {
       const email = req.query.email;
-      // console.log(email);
       const filter = { worker_email: email };
       const result = await submitCollection.find(filter).toArray();
       res.send(result);
@@ -386,7 +390,6 @@ async function run() {
       });
 
       const { worker_email, payable_amount } = submission;
-      // console.log(worker_email, payable_amount);
 
       //increment worker's collection
       const coinUpdateResult = await userCollection.updateOne(
@@ -430,7 +433,7 @@ async function run() {
     //reject submission
     app.patch("/submission/reject", async (req, res) => {
       const { submissionId, taskId } = req.body;
-      // console.log(submissionId, taskId);
+
       const submission = await submitCollection.findOne({
         _id: new ObjectId(submissionId),
       });
@@ -621,10 +624,10 @@ async function run() {
     //withdrawal form
     app.get("/withdrawal", async (req, res) => {
       const email = req.query.email;
-      // console.log(email);
+
       const filter = { email: email };
       const user = await userCollection.findOne(filter);
-      // console.log(user);
+
       let coins = user.coin;
 
       const withdrawalAmount = (coins / 20).toFixed(2);
@@ -636,7 +639,7 @@ async function run() {
     //add withdraw
     app.post("/addWithdraw", async (req, res) => {
       const data = req.body;
-      // console.log(data);
+
       const result = await withdrawalCollection.insertOne(data);
       res.send(result);
     });
@@ -652,7 +655,7 @@ async function run() {
     app.patch("/paymentSuccess/:id", async (req, res) => {
       const id = req.params.id;
       const { withdrawCoin, worker_email } = req.body;
-      console.log(withdrawCoin, worker_email);
+
       const withdrawalResult = await withdrawalCollection.updateOne(
         { _id: new ObjectId(id) },
         { $set: { status: "approved" } }
@@ -678,7 +681,6 @@ async function run() {
     app.post("/payments", async (req, res) => {
       const payment = req.body;
       const paymentResult = await paymentCollection.insertOne(payment);
-      // console.log("payment info", payment);
 
       const { email, price } = payment;
       let coinsToAdd = 0;
